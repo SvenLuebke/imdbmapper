@@ -41,17 +41,13 @@ qx{sed -i -e 10c'my \$path= "'$path'" ;' $path/worker2.pl} ;
 qx{sed -i -e 8c'my \$path= "'$path'" ;' $path/prozes.pl} ;
 
 #Create IMDB tasks
-qx{cp "$path/imdbtask.pl" "$path/imdbtask_1.pl" && cp "$path/imdbtask.pl" "$path/imdbtask_2.pl" && cp "$path/imdbtask.pl" "$path/imdbtask_3.pl" && cp "$path/imdbtask.pl" "$path/imdbtask_4.pl" && cp "$path/imdbtask.pl" "$path/imdbtask_5.pl" && cp "$path/imdbtask.pl" "$path/imdbtask_6.pl" && cp "$path/imdbtask.pl" "$path/imdbtask_7.pl" && cp "$path/imdbtask.pl" "$path/imdbtask_8.pl"};
+qx{cp "$path/imdbtask.pl" "$path/imdbtask_1.pl" && cp "$path/imdbtask.pl" "$path/imdbtask_2.pl" && cp "$path/imdbtask.pl" "$path/imdbtask_3.pl" && cp "$path/imdbtask.pl" "$path/imdbtask_4.pl"};
 qx{chmod 0777 -R $path/*} ;
 
 #Modify Tempfiles in taskfiles
 qx{sed -i -e 383c'my \$tempfile="/tmp/xmltv.xml_temp2";' $path/imdbtask_2.pl} ;
 qx{sed -i -e 383c'my \$tempfile="/tmp/xmltv.xml_temp3";' $path/imdbtask_3.pl} ;
 qx{sed -i -e 383c'my \$tempfile="/tmp/xmltv.xml_temp4";' $path/imdbtask_4.pl} ;
-qx{sed -i -e 383c'my \$tempfile="/tmp/xmltv.xml_temp5";' $path/imdbtask_5.pl} ;
-qx{sed -i -e 383c'my \$tempfile="/tmp/xmltv.xml_temp6";' $path/imdbtask_6.pl} ;
-qx{sed -i -e 383c'my \$tempfile="/tmp/xmltv.xml_temp7";' $path/imdbtask_7.pl} ;
-qx{sed -i -e 383c'my \$tempfile="/tmp/xmltv.xml_temp8";' $path/imdbtask_8.pl} ;
 
 #Delete all files older $cachetime
 print STDERR "Deleting all Cached Files older then $cachetime Days\n";
@@ -129,6 +125,14 @@ sub wait_for_worker {
         wait_for_worker();
     }
 }
+
+
+wait_for_worker();
+
+sleep(1);
+system "$path/status.sh destroy_scroll_area";
+system "$path/status.sh setup_scroll_area";
+system "perl $path/prozes.pl & perl $path/worker2.pl";
 
 
 wait_for_worker();
