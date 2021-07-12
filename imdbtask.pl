@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/env perl
 
 use utf8;
 use strict;
@@ -20,7 +20,7 @@ if ($num_args != 1) {
 
 my $xmlfile=$ARGV[0];
 my $parser=new XML::DOM::Parser;
-print STDERR "Reading XML file\n";
+print STDERR "Reading XML file $xmlfile\n";
 
 my $doc=$parser->parsefile($xmlfile) or die$!;
 print STDERR "Starting Pass 1, IMDB Search for Movies and Series\n";

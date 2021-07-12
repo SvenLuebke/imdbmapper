@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/env perl
 
 use utf8;
 use strict;
@@ -8,7 +8,7 @@ use Term::ANSIColor;
 binmode (STDERR,"encoding(utf8)");
 
 my $path= "imdb" ;
-my $xml_temp= "$path/temp/" ;
+my $xml_temp= "/tmp/imdb/";
 
 my $thread ="";
 $thread = qx{ps ax};
@@ -34,9 +34,9 @@ if ( -e "$xml_temp/workfile-04.xml")
                         qx{"$path/imdbtask_1.pl" "$xml_temp"workfile-01.xml > "$xml_temp"mappedfile-01.xml};
                             }
 
-sub wait_for_thread { 
+sub wait_for_thread {
     my $thread = qx{ps ax};
-    if ($thread=~ m/imdbtask_1/ || $thread=~ m/imdbtask_2/ || $thread=~ m/imdbtask_3/ || $thread=~ m/imdbtask_4/)  { 
+    if ($thread=~ m/imdbtask_1/ || $thread=~ m/imdbtask_2/ || $thread=~ m/imdbtask_3/ || $thread=~ m/imdbtask_4/)  {
         sleep(4);
         wait_for_thread();
     }
@@ -65,7 +65,7 @@ if ( -e "$xml_temp/workfile-08.xml")
                         print STDERR "Reading XML Part 5\n";
                         qx{"$path/imdbtask_1.pl" "$xml_temp"workfile-05.xml > "$xml_temp"mappedfile-05.xml};
                             }
-                            
+
 wait_for_thread();
 
 if ( -e "$xml_temp/workfile-12.xml")

@@ -8,7 +8,7 @@ use Term::ANSIColor;
 binmode (STDERR,"encoding(utf8)");
 
 my $path= "imdb" ;
-my $xml_temp= "$path/temp/" ;
+my $xml_temp= "/tmp/imdb/" ;
 
 my $thread ="";
 $thread = qx{ps ax};

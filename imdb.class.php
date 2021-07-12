@@ -109,6 +109,8 @@ class IMDB
      */
     public $bArrayOutput = false;
 
+    public static $pathCache = '/tmp/imdb_cache';
+
     /**
      * @var int Maximum cache time.
      */
@@ -142,8 +144,8 @@ class IMDB
         if ( ! is_writable($this->sRoot . '/posters') && ! mkdir($this->sRoot . '/posters')) {
             throw new Exception('The directory “' . $this->sRoot . '/posters” isn’t writable.');
         }
-        if ( ! is_writable($this->sRoot . '/cache') && ! mkdir($this->sRoot . '/cache')) {
-            throw new Exception('The directory “' . $this->sRoot . '/cache” isn’t writable.');
+        if ( ! is_writable(self::$pathCache) && ! mkdir(self::$pathCache)) {
+            throw new Exception('The directory “' . self::$pathCache . '” isn’t writable.');
         }
         if ( ! is_writable($this->sRoot . '/cast') && ! mkdir($this->sRoot . '/cast')) {
             throw new Exception('The directory “' . $this->sRoot . '/cast” isn’t writable.');
@@ -210,7 +212,7 @@ class IMDB
             $bSearch    = true;
 
             // Was this search already performed and cached?
-            $sRedirectFile = $this->sRoot . '/cache/' . sha1($this->sUrl) . '.redir';
+            $sRedirectFile = self::$pathCache . '/' . sha1($this->sUrl) . '.redir';
             if (is_readable($sRedirectFile)) {
                 if (self::IMDB_DEBUG) {
                     echo '<pre><b>Using redirect:</b> ' . basename($sRedirectFile) . '</pre>';
@@ -223,7 +225,7 @@ class IMDB
         }
 
         // Does a cache of this movie exist?
-        $sCacheFile = $this->sRoot . '/cache/' . sha1($this->iId) . '.cache';
+        $sCacheFile = self::$pathCache . '/' . sha1($this->iId) . '.cache';
         if (is_readable($sCacheFile)) {
             $iDiff = round(abs(time() - filemtime($sCacheFile)) / 60);
             if ($iDiff < $this->iCache) {
@@ -338,7 +340,7 @@ class IMDB
     {
         if (true === $this->isReady) {
             // Does a cache of this movie exist?
-            $sCacheFile = $this->sRoot . '/cache/' . sha1($this->iId) . '_akas.cache';
+            $sCacheFile = self::$pathCache . '/' . sha1($this->iId) . '_akas.cache';
             $bUseCache  = false;
 
             if (is_readable($sCacheFile)) {
@@ -1015,7 +1017,7 @@ class IMDB
     {
         if (true === $this->isReady) {
             // Does a cache of this movie exist?
-            $sCacheFile = $this->sRoot . '/cache/' . sha1($this->iId) . '_locations.cache';
+            $sCacheFile = self::$pathCache . '/' . sha1($this->iId) . '_locations.cache';
             $bUseCache  = false;
 
             if (is_readable($sCacheFile)) {
@@ -1209,7 +1211,7 @@ class IMDB
     {
         if (true === $this->isReady) {
             // Does a cache of this movie exist?
-            $sCacheFile = $this->sRoot . '/cache/' . sha1($this->iId) . '_akas.cache';
+            $sCacheFile = self::$pathCache . '/' . sha1($this->iId) . '_akas.cache';
             $bUseCache  = false;
 
             if (is_readable($sCacheFile)) {
