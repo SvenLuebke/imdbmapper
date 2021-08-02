@@ -13,12 +13,14 @@ binmode (STDERR,"encoding(utf8)");
 my $path= "imdb" ;
 
 my $num_args = $#ARGV + 1;
-if ($num_args != 1) {
-  print STDERR "\nArg=$num_args Usage: <script> <xmlfile>\n";
+if ($num_args != 2) {
+  print STDERR "\nArg=$num_args Usage: <script> <instanceID> <xmlfile>\n";
   exit;
 }
 
-my $xmlfile=$ARGV[0];
+my $suffixTempfile = $ARGV[0];
+my $xmlfile=$ARGV[1];
+
 my $parser=new XML::DOM::Parser;
 print STDERR "Reading XML file $xmlfile\n";
 
@@ -380,7 +382,7 @@ print STDERR "IMDB Search for $xmlfile is complete\n";
 
 
 
-my $tempfile="/tmp/xmltv.xml_temp1";
+my $tempfile="/tmp/xmltv.xml_temp".$suffixTempfile;
 $doc->printToFile($tempfile);
 $doc->dispose;
 

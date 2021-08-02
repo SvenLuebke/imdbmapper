@@ -40,15 +40,6 @@ qx{sed -i -e 10c'my \$path= "'$path'" ;' $path/worker1.pl} ;
 qx{sed -i -e 10c'my \$path= "'$path'" ;' $path/worker2.pl} ;
 qx{sed -i -e 8c'my \$path= "'$path'" ;' $path/prozes.pl} ;
 
-#Create IMDB tasks
-qx{cp "$path/imdbtask.pl" "$path/imdbtask_1.pl" && cp "$path/imdbtask.pl" "$path/imdbtask_2.pl" && cp "$path/imdbtask.pl" "$path/imdbtask_3.pl" && cp "$path/imdbtask.pl" "$path/imdbtask_4.pl"};
-qx{chmod 0777 -R $path/*} ;
-
-#Modify Tempfiles in taskfiles
-qx{sed -i -e 383c'my \$tempfile="/tmp/xmltv.xml_temp2";' $path/imdbtask_2.pl} ;
-qx{sed -i -e 383c'my \$tempfile="/tmp/xmltv.xml_temp3";' $path/imdbtask_3.pl} ;
-qx{sed -i -e 383c'my \$tempfile="/tmp/xmltv.xml_temp4";' $path/imdbtask_4.pl} ;
-
 #Delete all files older $cachetime
 print STDERR "Deleting all Cached Files older then $cachetime Days\n";
 
@@ -118,9 +109,9 @@ system "$path/status.sh setup_scroll_area";
 sleep(1);
 system "perl $path/prozes.pl & perl $path/worker1.pl";
 
-sub wait_for_worker { 
+sub wait_for_worker {
     my $thread = qx{ps ax};
-    if ($thread=~ m/imdb\/worker1/ || $thread=~ m/imdb\/worker2/ )  { 
+    if ($thread=~ m/imdb\/worker1/ || $thread=~ m/imdb\/worker2/ )  {
         sleep(4);
         wait_for_worker();
     }
@@ -152,9 +143,8 @@ qx{xml_merge -o $xmlout $xml_temp/mappedfile-00.xml};
 
 wait;
 
-print STDERR "Deleting Workfiles\n";
-qx{rm -rf "$xml_temp"};
-qx{rm $path/imdbtask_*};
+#print STDERR "Deleting Workfiles\n";
+#qx{rm -rf "$xml_temp"};
 
 exit;
 
