@@ -3,87 +3,77 @@
 use utf8;
 use strict;
 use warnings;
+
+use threads;
 use Term::ANSIColor;
+use Time::HiRes qw(usleep nanosleep);
 
 binmode (STDERR,"encoding(utf8)");
 
+my $numberOfParts = 49;
+my $threadMaxNumber = 6;
+
 my $path= "imdb" ;
-my $xml_temp= "/tmp/imdb/";
+
+my $xml_temp= $ENV{'PATH_TMP_IMDB'};
 
 my $thread ="";
 $thread = qx{ps ax};
 
+my @threads;
 
-sub generateQxString($ $)
+#my ($input, $output) = @ARGV;
+print "DBG # ".__LINE__."$0 : started\n";
+
+sub threadImdbTask($)
 {
-  my( $tmpLoopStart, $tmpLoopEnd ) = @_;
-  my $qxString;
-  my $outputString;
+  my( $tmpIndex) = @_;
+  my $strIndex = sprintf("%02d", $tmpIndex);
 
-  $outputString = "Reading XML Part ";
-  my $instanceIndex = 0;
-  for (my $loop = $tmpLoopStart; $loop < $tmpLoopEnd; $loop++)
+  if ( -e "$xml_temp/workfile-${strIndex}.xml")
   {
-    my $tmpIndex = sprintf("%02d", $loop);
-    $instanceIndex++;
-    $qxString .= "$path/imdbtask.pl $instanceIndex ${xml_temp}workfile-${tmpIndex}.xml > ${xml_temp}mappedfile-${tmpIndex}.xml & ";
-    $outputString .= $tmpIndex . " ";
-  }
-  $outputString .= "Together for faster ImdB Download\n";
-  print STDERR $outputString;
-  return $qxString;
-}
-
-sub startThreadsForPart($ $)
-{
-  my( $tmpLoopStart, $tmpLoopEnd ) = @_;
-
-
-  for (my $loop = $tmpLoopStart; $loop > $tmpLoopEnd; $loop--)
-  {
-    my $tmpIndex = sprintf("%02d", $loop);
-    if ( -e "$xml_temp/workfile-${tmpIndex}.xml")
-    {
-        qx( @{[ main::generateQxString($tmpLoopEnd+1, $loop+1) ]} );
-        last;
-    }
+    print STDERR "Reading XML Part : $strIndex";
+    qx{perl $path/imdbtask.pl ${strIndex} ${xml_temp}/workfile-${strIndex}.xml > ${xml_temp}/mappedfile-${strIndex}.xml};
   }
 }
 
-sub wait_for_thread {
-    my $thread = qx{ps ax};
-    if ($thread=~ m/imdbtask/)  {
-        sleep(4);
-        wait_for_thread();
+# set the array to max number
+$#threads = $threadMaxNumber;
+my $threadIndex = 1;
+my $threadLimitCounter = 0;
+
+while (($threadIndex <= $numberOfParts) || ($threadLimitCounter > 0))
+{
+  foreach ( @threads ) {
+    # look for free space in array for new threads
+    if (not defined $_) {
+      if ($threadIndex <= $numberOfParts) {
+        my $thr = threads->create(\&threadImdbTask, $threadIndex);
+        print "found free! Size is $#threads\n";
+        $_ = $thr;
+        #print "Active threads: " . threads->list() . "\n";
+        $threadLimitCounter++;
+        $threadIndex++;
+      }
     }
+    else {
+      if ($_->is_joinable())
+      {
+    	  print "Found joinable thread. $threadLimitCounter $threadIndex\n";
+        $_->join();
+        $threadLimitCounter--;
+        $_ = undef;
+      }
+    }
+  }
+  sleep(1);
 }
 
-startThreadsForPart(4, 0);
+print "$0 : ".__LINE__."\n";
+# just to be sure: wait for all processes
+#wait;
 
-wait;
-wait_for_thread();
-
-startThreadsForPart(8, 4);
-
-wait_for_thread();
-
-startThreadsForPart(12, 8);
-
-wait_for_thread();
-
-startThreadsForPart(16, 12);
-
-wait_for_thread();
-
-startThreadsForPart(20, 16);
-
-wait_for_thread();
-
-startThreadsForPart(24, 20);
-
-wait_for_thread();
-wait;
-
+print "$0: end()";
 
 1;
 exit;

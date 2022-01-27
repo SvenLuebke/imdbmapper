@@ -17,11 +17,17 @@ binmode (STDERR,"encoding(utf8)");
 #Path to php helper-scripts i.E Path to "age.php"
 my $path= "imdb" ;
 
+my $pathTMP = '/tmp/imdb';
+$pathTMP = "$ENV{'PATH_TMP_IMDB'}";
+
 # Max Cachetime in Days
 my $cachetime = 5;
 
+my ($xmlfile, $xmlout) = @ARGV;
+print "DBG # ".__LINE__." # $0 : started with $xmlfile $xmlout\n";
+
 #Check if all Files exist
-if (-e "$path/age.php" && -e "$path/country.php"  && -e "$path/imdb.class.php"  && -e "$path/poster.php"  && -e "$path/rating.php"  && -e "$path/url.php"  && -e "$path/year.php" && -e "$path/imdbtask.pl" && -e "$path/worker1.pl" && -e "$path/worker2.pl" && -e "$path/bar.sh" && -e "$path/prozes.pl")
+if (-e "$path/age.php" && -e "$path/country.php"  && -e "$path/imdb.class.php"  && -e "$path/poster.php"  && -e "$path/rating.php"  && -e "$path/url.php"  && -e "$path/year.php" && -e "$path/imdbtask.pl" && -e "$path/worker1.pl" && -e "$path/bar.sh" && -e "$path/prozes.pl")
 {
     print STDERR color("green"), "Helperscripts Found OK\n", color("reset");
 } else {
@@ -57,9 +63,6 @@ while (readdir($cache)) {
     }
 }
 
-my $xmlfile=$ARGV[0];
-my $xmlout=$ARGV[1];
-
 my $xml_temp= "/tmp/imdb";
 
 if ( !-d $xml_temp ) {
@@ -76,11 +79,11 @@ my $thread ="";
 $thread = qx{ps ax};
 
 print STDERR "Create Status Bar\n";
-system "echo '#!/bin/bash' > $path/status.sh";
-system "echo 'source $path\/bar.sh' >> $path/status.sh";
-system "echo 'ARGV1\=\$1' >> $path/status.sh";
-system "echo '\$ARGV1' >> $path/status.sh";
-system "chmod 0777 $path/status.sh";
+system "echo '#!/bin/bash' > $pathTMP/status.sh";
+system "echo 'source $path\/bar.sh' >> $pathTMP/status.sh";
+system "echo 'ARGV1\=\$1' >> $pathTMP/status.sh";
+system "echo '\$ARGV1' >> $pathTMP/status.sh";
+system "chmod 0777 $pathTMP/status.sh";
 
 
 
@@ -88,25 +91,18 @@ my $splitfiles = '49';
 my $splitsize = $size / $splitfiles ;
 $splitsize = int($splitsize);
 
+
 print STDERR "Splitting XML in $splitfiles Files\n";
-
-
 qx{cp "$xmlfile" "$xml_temp/workfile"};
-
-
-system "$path/status.sh setup_scroll_area";
-sleep(1);
+system "$pathTMP/status.sh setup_scroll_area";
 system "$path/prozes.pl & xml_split -s $splitsize $xml_temp/workfile";
-sleep(1);
-system "$path/status.sh destroy_scroll_area";
+system "$pathTMP/status.sh destroy_scroll_area";
 
 
 print STDERR "Creating Index for Splitted Files\n";
-system"cp $xml_temp/workfile-00.xml $xml_temp/mappedfile-00.xml";
+system "cp $xml_temp/workfile-00.xml $xml_temp/mappedfile-00.xml";
 qx{sed -i 's/workfile/mappedfile/g' $xml_temp/mappedfile-00.xml};
-
-system "$path/status.sh setup_scroll_area";
-sleep(1);
+system "$pathTMP/status.sh setup_scroll_area";
 system "perl $path/prozes.pl & perl $path/worker1.pl";
 
 sub wait_for_worker {
@@ -121,20 +117,17 @@ sub wait_for_worker {
 wait_for_worker();
 
 sleep(1);
-system "$path/status.sh destroy_scroll_area";
-system "$path/status.sh setup_scroll_area";
-
-system "perl $path/prozes.pl & perl $path/worker2.pl";
-
+system "$pathTMP/status.sh destroy_scroll_area";
+system "$pathTMP/status.sh setup_scroll_area";
 
 wait_for_worker();
 
 sleep(1);
 
 print STDERR color("green"), "\nIMDB SERARCH COMPLETE!\n", color("reset");
-system "$path/status.sh 'draw_progress_bar 100' ";
+system "$pathTMP/status.sh 'draw_progress_bar 100' ";
 sleep(2);
-system "$path/status.sh destroy_scroll_area";
+system "$pathTMP/status.sh destroy_scroll_area";
 sleep(1);
 
 
@@ -143,7 +136,7 @@ qx{xml_merge -o $xmlout $xml_temp/mappedfile-00.xml};
 
 wait;
 
-#print STDERR "Deleting Workfiles\n";
+print STDERR "Deleting Workfiles\n";
 #qx{rm -rf "$xml_temp"};
 
 exit;
