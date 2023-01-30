@@ -27,7 +27,7 @@ my ($xmlfile, $xmlout) = @ARGV;
 print "DBG # ".__LINE__." # $0 : started with $xmlfile $xmlout\n";
 
 #Check if all Files exist
-if (-e "$path/age.php" && -e "$path/country.php"  && -e "$path/imdb.class.php"  && -e "$path/poster.php"  && -e "$path/rating.php"  && -e "$path/url.php"  && -e "$path/year.php" && -e "$path/imdbtask.pl" && -e "$path/worker1.pl" && -e "$path/bar.sh" && -e "$path/prozes.pl")
+if (-e "$path/imdb.class.php"  && -e "$path/imdb_all.php" && -e "$path/imdbtask.pl" && -e "$path/worker1.pl" && -e "$path/bar.sh" && -e "$path/prozes.pl")
 {
     print STDERR color("green"), "Helperscripts Found OK\n", color("reset");
 } else {
@@ -41,10 +41,7 @@ if ($num_args != 2) {
 }
 
 #Insert Pathinfo to taskfile+worker+prozes
-qx{sed -i -e 13c'my \$path= "'$path'" ;' $path/imdbtask.pl} ;
-qx{sed -i -e 10c'my \$path= "'$path'" ;' $path/worker1.pl} ;
-qx{sed -i -e 10c'my \$path= "'$path'" ;' $path/worker2.pl} ;
-qx{sed -i -e 8c'my \$path= "'$path'" ;' $path/prozes.pl} ;
+
 
 #Delete all files older $cachetime
 print STDERR "Deleting all Cached Files older then $cachetime Days\n";
@@ -93,7 +90,7 @@ $splitsize = int($splitsize);
 
 
 print STDERR "Splitting XML in $splitfiles Files\n";
-qx{cp "$xmlfile" "$xml_temp/workfile"};
+system "cp $xmlfile $xml_temp/workfile";
 system "$pathTMP/status.sh setup_scroll_area";
 system "$path/prozes.pl & xml_split -s $splitsize $xml_temp/workfile";
 system "$pathTMP/status.sh destroy_scroll_area";

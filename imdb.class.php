@@ -13,7 +13,7 @@
  * @author  Fabian Beiner <fb@fabianbeiner.de>
  * @license https://opensource.org/licenses/MIT The MIT License
  * @link    https://github.com/FabianBeiner/PHP-IMDB-Grabber/ GitHub Repository
- * @version 6.1.7
+ * @version 6.1.9
  */
 class IMDB
 {
@@ -32,11 +32,17 @@ class IMDB
      * if you get no result, it will use the advanced method
      */
     const IMDB_SEARCH_ORIGINAL = true;
-    
+
+    /**
+     * Set this to true if you want to search for exact titles
+     * it falls back to false if theres no result
+     */
+    const IMDB_EXACT_SEARCH = true;
+
     /**
      * Set the sensitivity for search results in percentage.
      */
-    const IMDB_SENSITIVITY = 80;
+    const IMDB_SENSITIVITY = 85;
     
     /**
      * Define the timeout for cURL requests.
@@ -78,7 +84,7 @@ class IMDB
     const IMDB_NOT_FOUND_ADV = '~<span>No results.</span>~Ui';
     const IMDB_NOT_FOUND_DES = 'Know what this is about';
     const IMDB_NOT_FOUND_ORG = '~<h1 class="findHeader">No results found for ~Ui';
-    const IMDB_PLOT          = '~<td[^>]*>\s*Plot\s*Summary\s*</td>\s*<td>\s*<p>\s*(.*)\s*<em~Ui';
+    const IMDB_PLOT          = '~<td[^>]*>\s*Plot\s*Summary\s*</td>\s*<td>\s*<p>\s*(.*)\s*</p>~Ui';
     const IMDB_PLOT_KEYWORDS = '~<td[^>]*>Plot\s*Keywords</td>\s*<td>(.+)(?:<a\s*href="/title/[^>]*>[^<]*</a>\s*</li>\s*</ul>\s*)?</td>~Ui';
     const IMDB_POSTER        = '~<link\s*rel=\'image_src\'\s*href="(.*)">~Ui';
     const IMDB_RATING        = '~class="ipl-rating-star__rating">(.*)<~Ui';
@@ -86,7 +92,7 @@ class IMDB
     const IMDB_RELEASE_DATE  = '~href="/title/[t0-9]*/releaseinfo">(.*)<~Ui';
     const IMDB_RUNTIME       = '~<td[^>]*>\s*Runtime\s*</td>\s*<td>(.+)</td>~Ui';
     const IMDB_SEARCH_ADV    = '~text-primary">1[.]</span>\s*<a.href="\/title\/(tt\d{6,})\/(?:.*?)"(?:\s*)>(?:.*?)<\/a>~Ui';
-    const IMDB_SEARCH_ORG    = '~href="\/title\/(tt\d{6,})\/(?:.*?)"\s>(?!<img)(.*?)<\/a>\s(\(([0-9]{4})\))?\s(?:<br/>aka\s<i>"(.*?)"</i>)?~';
+    const IMDB_SEARCH_ORG    = '~find-title-result">(?:.*?)alt="(.*?)"(?:.*?)href="\/title\/(tt\d{6,})\/(?:.*?)">(.*?)<\/a>~';
     const IMDB_SEASONS       = '~episodes\?season=(?:\d+)">(\d+)<~Ui';
     const IMDB_SOUND_MIX     = '~<td[^>]*>\s*Sound\s*Mix\s*</td>\s*<td>(.+)</td>~Ui';
     const IMDB_TAGLINE       = '~<td[^>]*>\s*Taglines\s*</td>\s*<td>(.+)</td>~Ui';
@@ -203,6 +209,12 @@ class IMDB
             $this->iCache = (int) $iCache;
         }
         
+        if (self::IMDB_EXACT_SEARCH) {
+            if ($this->fetchUrl($sSearch, self::IMDB_SEARCH_ORIGINAL, true)) {
+                return true;
+            }
+        }
+
         if ($this->fetchUrl($sSearch, self::IMDB_SEARCH_ORIGINAL)) {
             return true;
         }
@@ -219,7 +231,7 @@ class IMDB
      *
      * @return bool True on success, false on failure.
      */
-    private function fetchUrl($sSearch, $orgSearch = false)
+    private function fetchUrl($sSearch, $orgSearch = false, $exactSearch = false)
     {
         $sSearch = trim($sSearch);
 
@@ -284,7 +296,10 @@ class IMDB
                     $sSearch = $sTempSearch . ' (' . $sYear . ')';
                 }
                 
-                $this->sUrl = 'https://www.imdb.com/find?q=' . rawurlencode(str_replace(' ', '+', $sSearch)) . $sParameters;                
+                if ($exactSearch) {
+                    $sParameters .= '&exact=true';
+                }
+                $this->sUrl = 'https://www.imdb.com/find/?q=' . rawurlencode(str_replace(' ', ' ', $sSearch)) . $sParameters;                
             }
             
             $bSearch    = true;
@@ -304,7 +319,7 @@ class IMDB
 
         // Does a cache of this movie exist?
         if (! is_null($this->iId)) {
-            $sCacheFile = self::$pathCache . '/' . sha1($this->iId) . '.cache';
+            $sCacheFile = self::$pathCache . '/'. sha1($this->iId) . '.cache';
             if (is_readable($sCacheFile)) {
                 $iDiff = round(abs(time() - filemtime($sCacheFile)) / 60);
                 if ($iDiff < $this->iCache) {
@@ -361,6 +376,7 @@ class IMDB
             $aReturned = IMDBHelper::matchRegex($sSource, self::IMDB_SEARCH_ORG);
 
             if ($aReturned) {
+                $rData = [];
                 $fTempPercent = 0.00;
                 $iTempId = "";
                 $sYear = 0;
@@ -374,32 +390,65 @@ class IMDB
                 }
 
                 foreach ($aReturned[1] as $i => $value) {
-                    $sTitle = $aReturned[2][$i];
+                    $sId = $aReturned[2][$i];
+                    $sTitle = $aReturned[3][$i];
                     $perc = 0.00;
+                    $year = 0;
 
                     if ($sYear === 0) {
                         $sim = similar_text($sSearch, $sTitle, $perc);
                     } else {
-                        if ($sYear != $aReturned[4][$i]) {
+                        $sMatch = IMDBHelper::matchRegex($aReturned[1][$i], '~\(?([0-9]{4})\)?~', 1);
+                        if (false !== $sMatch) {
+                            $year = $sMatch;
+                        }
+
+                        if ($sYear != $year) {
                             continue;
                         }
+
                         $sim = similar_text($sTempSearch, $sTitle, $perc); 
                     }
 
-                    if (round($perc, 3) > round($fTempPercent, 3)) {
-                        $iTempId = $value;
-                        $fTempPercent = $perc;
-                        if (true === self::IMDB_DEBUG) {
-                            echo '<pre><b>Set Result:</b> ' . $sSearch . ' =>  ' . $sTitle . ' (' . $perc . '%) </pre>';
-                        }
-                    }
+                    $rData[] = [
+                        'id'	=> $sId,
+                        'title' => $sTitle,
+                        'year' 	=> $year,
+                        'match' => floatval($perc)
+                    ];
+        
 
                 }
 
-                if ((round($fTempPercent, 0) > self::IMDB_SENSITIVITY)) {
-                    $sUrl = 'https://www.imdb.com/title/' . $iTempId . '/reference';
+                if (sizeof($rData) === 0) {
+                    return false;
+                }
+
+                if (true === self::IMDB_DEBUG) {
+                    foreach ($rData as $sArray) {
+                        echo '<pre><b>Found results:</b> ' . $sArray['id'] . ' =>  ' . $sArray['title'] . ' (' . $sArray['match']. '%) </pre>';
+                    }
+                }
+                
+                //get highest match of search results
+                $matches = array_column($rData, 'match');
+                $maxv = max($matches);
+        
+                $marray = array_filter($rData, function($item) use ($maxv) {
+                    return $item['match'] == $maxv;
+                });
+    
+                $marray = reset($marray);
+
+                if (sizeof($marray) > 0) {
+                    if (!$exactSearch && round($marray['match'], 0) < self::IMDB_SENSITIVITY) {
+                        echo '<pre><b>Bad sensitivity:</b> ' . $marray['id'] . ' =>  ' . $marray['title'] . ' (' . $marray['match']. '%) </pre>';
+                        return false;
+                    }
+                    
+                    $sUrl = 'https://www.imdb.com/title/' . $marray['id'] . '/reference';
                     if (true === self::IMDB_DEBUG) {
-                        echo '<pre><b>Percentage:</b> ' . $iTempId . ' =>  ' . $fTempPercent . '% </pre>';
+                        echo '<pre><b>Get best result:</b> ' . $marray['title'] . ' ' . $marray['id'] . ' =>  ' . $marray['match'] . '% </pre>';
                         echo '<pre><b>New redirect saved:</b> ' . basename($sRedirectFile) . ' => ' . $sUrl . '</pre>';
                     }
                     file_put_contents($sRedirectFile, $sUrl);
@@ -1671,17 +1720,17 @@ class IMDB
         if (true === $this->isReady) {
             $sMatch = IMDBHelper::matchRegex($this->sSource, self::IMDB_POSTER, 1);
             if (false !== $sMatch) {
-                if ('big' === strtolower($sSize) && false !== strstr($sMatch, '@._')) {
-                    $sMatch = substr($sMatch, 0, strpos($sMatch, '@._')) . '@.jpg';
+                if ('big' === strtolower($sSize) && false !== strstr($sMatch, '._')) {
+                    $sMatch = substr($sMatch, 0, strpos($sMatch, '._')) . '.jpg';
                 }
-                if ('xxs' === strtolower($sSize) && false !== strstr($sMatch, '@._')) {
-                    $sMatch = substr($sMatch, 0, strpos($sMatch, '@._')) . '@._V1_UY67_CR0,0,45,67_AL_.jpg';
+                if ('xxs' === strtolower($sSize) && false !== strstr($sMatch, '._')) {
+                    $sMatch = substr($sMatch, 0, strpos($sMatch, '._')) . '._V1_UY67_CR0,0,45,67_AL_.jpg';
                 }
-                if ('xs' === strtolower($sSize) && false !== strstr($sMatch, '@._')) {
-                    $sMatch = substr($sMatch, 0, strpos($sMatch, '@._')) . '@._V1_UY113_CR0,0,76,113_AL_.jpg';
+                if ('xs' === strtolower($sSize) && false !== strstr($sMatch, '._')) {
+                    $sMatch = substr($sMatch, 0, strpos($sMatch, '._')) . '._V1_UY113_CR0,0,76,113_AL_.jpg';
                 }
-                if ('s' === strtolower($sSize) && false !== strstr($sMatch, '@._')) {
-                    $sMatch = substr($sMatch, 0, strpos($sMatch, '@._')) . '@._V1_UX182_CR0,0,182,268_AL_.jpg';
+                if ('s' === strtolower($sSize) && false !== strstr($sMatch, '._')) {
+                    $sMatch = substr($sMatch, 0, strpos($sMatch, '._')) . '._V1_UX182_CR0,0,182,268_AL_.jpg';
                 }
                 if (false === $bDownload) {
                     return IMDBHelper::cleanString($sMatch);
@@ -1968,6 +2017,127 @@ class IMDB
 
         return self::$sNotFound;
     }
+
+    /**
+     * @return array Array with season, episode, title, rating, votes, airdate, plot, id.
+     */
+    public function getTVInfo()
+    {
+        if (true === $this->isReady) {
+            // Does a cache of this movie exist?
+            $sCacheFile = $this->sRoot . '/cache/' . sha1($this->iId) . '_tv.cache';
+            $bUseCache  = false;
+
+            if (is_readable($sCacheFile)) {
+                $iDiff = round(abs(time() - filemtime($sCacheFile)) / 60);
+                if ($iDiff < $this->iCache || false) {
+                    $bUseCache = true;
+                }
+            }
+
+            if ($bUseCache) {
+                $aRawReturn = file_get_contents($sCacheFile);
+                $aReturn    = unserialize($aRawReturn);
+                $anReturn   = [];
+                foreach ($aReturn as $i => $sAreturn) {
+                    $season = $sAreturn['season'];
+                    $episode = $sAreturn['episode'];
+                    $title = $sAreturn['title'];
+                    $rating = $sAreturn['rating'];
+                    $votes = $sAreturn['votes'];
+                    $airdate = $sAreturn['airdate'];
+                    $plot = $sAreturn['plot'];
+                    $id = $sAreturn['id'];
+
+                    $anReturn[] = [
+                        'season'    => $season,
+                        'episode'   => $episode,
+                        'title'     => $title,
+                        'rating'    => $rating,
+                        'votes'     => $votes,
+                        'airdate'   => $airdate,
+                        'plot'      => $plot,
+                        'id'        => $id
+                    ];
+                }
+                return IMDBHelper::arrayOutput($this->bArrayOutput, $this->sSeparator, self::$sNotFound, $anReturn);
+
+            } else {
+                $isPage = true;
+                $aReturn = [];
+                $page = 1;
+                while ($isPage) {
+                    $fullEpisodes  = sprintf('https://www.imdb.com/title/tt%s/episodes?season=%d', $this->iId, $page);
+                    $aCurlInfo = IMDBHelper::runCurl($fullEpisodes);
+                    $sSource   = $aCurlInfo['contents'];
+
+                    if (false === $sSource) {
+                        if (true === self::IMDB_DEBUG) {
+                            echo '<pre><b>cURL error:</b> ' . var_dump($aCurlInfo) . '</pre>';
+                        }
+
+                        return false;
+                    }
+
+                    $aSplit = IMDBHelper::matchRegex($sSource, '~<meta itemprop="episodeNumber"(.*?)<div class="wtw-option-standalone".data-tconst="(.*?)".data-watchtype="minibar".data-baseref="ttep">~s');
+                    if ($aSplit) {
+                        foreach ($aSplit[1] as $i => $text) {
+                            $aReturned = IMDBHelper::matchRegex($aSplit[1][$i], '~content="(.*?)"(?:.*)"airdate">\s+(.*?)\s+<\/div>(?:.*)<strong><a.href="\/title\/(tt\d{6,})(?:.*?)"\s+?title="(.*?)".itemprop="name">(?:.*)"ipl-rating-star__rating">(.*?)<\/span>\s+<span.class="ipl-rating-star__total-votes">\((.*?)\)<\/span>(?:.*)itemprop="description">(.*?)<\/div>~s');                            
+				            if ($aReturned) {
+                                foreach ($aReturned[1] as $n => $episode) {
+                                    $aReturn[] = [
+                                        'season'    => $page,
+                                        'episode'   => IMDBHelper::cleanString($aReturned[1][$n]),
+                                        'title'     => IMDBHelper::cleanString($aReturned[4][$n]),
+                                        'rating'    => IMDBHelper::cleanString($aReturned[5][$n]),
+                                        'votes'     => IMDBHelper::cleanString($aReturned[6][$n]),
+                                        'airdate'   => IMDBHelper::cleanString($aReturned[2][$n]),
+                                        'plot'      => IMDBHelper::cleanString($aReturned[7][$n]),
+                                        'id'        => IMDBHelper::cleanString($aReturned[3][$n]),
+                                    ];
+                                }
+                            }
+                        }
+                    }
+                    
+                    file_put_contents($sCacheFile, serialize($aReturn));
+                    if (preg_match('~href="\?season=-1~s', $sSource) || !preg_match('~id="load_next_episodes"~', $sSource)) {
+                        break;
+                    }
+
+                    $page++;       
+                }
+
+                $anReturn   = [];
+                foreach ($aReturn as $i => $sAreturn) {
+                    $season = $sAreturn['season'];
+                    $episode = $sAreturn['episode'];
+                    $title = $sAreturn['title'];
+                    $rating = $sAreturn['rating'];
+                    $votes = $sAreturn['votes'];
+                    $airdate = $sAreturn['airdate'];
+                    $plot = $sAreturn['plot'];
+                    $id = $sAreturn['id'];
+
+                    $anReturn[] = [
+                        'season'    => $season,
+                        'episode'   => $episode,
+                        'title'     => $title,
+                        'rating'    => $rating,
+                        'votes'     => $votes,
+                        'airdate'   => $airdate,
+                        'plot'      => $plot,
+                        'id'        => $id
+                    ];
+                }
+
+                return IMDBHelper::arrayOutput($this->bArrayOutput, $this->sSeparator, self::$sNotFound, $anReturn);
+            }
+        }
+
+        return IMDBHelper::arrayOutput($this->bArrayOutput, $this->sSeparator, self::$sNotFound);
+    }
+
 
     /**
      *
